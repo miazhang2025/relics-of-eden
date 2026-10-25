@@ -1,6 +1,6 @@
 // 音频总线：ambience / sfx / master。
 // ambience：每个探索场景一首循环背景音乐（public/audio/<scene>.mp3，源文件在 art/textures/music/，用 ffmpeg 转成 mp3），
-// 走 WebAudio GainNode 做淡入淡出（iOS Safari 不认 HTMLAudioElement.volume）。ending 暂无音乐，进入时淡出静音。
+// 走 WebAudio GainNode 做淡入淡出（iOS Safari 不认 HTMLAudioElement.volume）。ending 页也有一首（public/audio/ending.mp3）。
 // sfx 素材未到位，仍是静音占位（只打 console.debug），调用点已经埋好。
 
 import type { AudioConfig, SceneId } from '../config/schema'
@@ -12,6 +12,7 @@ const AMBIENCE: Partial<Record<SceneId | 'ending', string>> = {
   cave: 'audio/cave.mp3',
   garden: 'audio/garden.mp3',
   ocean: 'audio/ocean.mp3',
+  ending: 'audio/ending.mp3',
 }
 
 const url = (path: string) => `${import.meta.env.BASE_URL}${path}`
