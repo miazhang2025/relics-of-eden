@@ -1,15 +1,18 @@
 // 音频总线：ambience / sfx / master。
 // ambience：每个探索场景一首循环背景音乐（public/audio/<scene>.mp3，源文件在 art/textures/music/，用 ffmpeg 转成 mp3，
 // 并用 loudnorm 统一响度到 -20 LUFS，保证各场景音量一致、不会太响），
-// 走 WebAudio GainNode 做淡入淡出（iOS Safari 不认 HTMLAudioElement.volume）。ending 页也有一首（public/audio/ending.mp3）。
+// 走 WebAudio GainNode 做淡入淡出（iOS Safari 不认 HTMLAudioElement.volume）。landing、ending 页也各有一首（public/audio/landing.mp3、ending.mp3）。
 // sfx 素材未到位，仍是静音占位（只打 console.debug），调用点已经埋好。
 
 import type { AudioConfig, SceneId } from '../config/schema'
 import { useConfigStore } from '../state/useConfigStore'
 
+export type AmbienceKey = SceneId | 'landing' | 'ending'
+
 export type SfxName = 'zoneEnter' | 'assetNear' | 'collect' | 'boxReveal' | 'photoExport'
 
-const AMBIENCE: Partial<Record<SceneId | 'ending', string>> = {
+const AMBIENCE: Partial<Record<AmbienceKey, string>> = {
+  landing: 'audio/landing.mp3',
   cave: 'audio/cave.mp3',
   garden: 'audio/garden.mp3',
   ocean: 'audio/ocean.mp3',
@@ -22,7 +25,7 @@ const ENDING_EXTRA_FADE_IN = 4.5
 const url = (path: string) => `${import.meta.env.BASE_URL}${path}`
 
 interface Track {
-  key: SceneId | 'ending'
+  key: AmbienceKey
   el: HTMLAudioElement
   gain: GainNode
 }
@@ -39,7 +42,7 @@ function getCtx(): AudioContext | null {
   return ctx
 }
 
-/** 当前探索场景的音频参数；ending 没有 audio 段，沿用最近一次探索场景的 */
+/** 当前探索场景的音频参数；landing / ending 没有 audio 段，沿用最近一次探索场景的（landing 时是默认的 cave） */
 function audioCfg(): AudioConfig {
   const s = useConfigStore.getState()
   return s.configs[s.scene].audio
@@ -69,8 +72,9 @@ function fadeOutAndDispose(track: Track, seconds: number) {
 
 function tryPlay(el: HTMLAudioElement) {
   el.play().catch(() => {
-    // 直接刷新进场景页时没有用户手势，等第一次交互再播
+    // 开始页、或直接刷新进场景页时没有用户手势，等第一次交互再播
     const retry = () => {
+      if (current?.el !== el) return // 等待期间已经切走了
       void ctx?.resume()
       void el.play().catch(() => {})
     }
@@ -90,7 +94,7 @@ export const AudioBus = {
   resume() {
     void getCtx()?.resume()
   },
-  playAmbience(scene: SceneId | 'ending' | null) {
+  playAmbience(scene: AmbienceKey | null) {
     const cfg = audioCfg()
     if (current?.key === scene) return
     if (current) fadeOutAndDispose(current, cfg.ambience.fadeOut)

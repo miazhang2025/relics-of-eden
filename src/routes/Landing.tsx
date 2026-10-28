@@ -57,6 +57,11 @@ export default function Landing() {
   const [progress, setProgress] = useState({ done: 0, total: 1 })
   const [timedOut, setTimedOut] = useState(false)
   useEffect(() => {
+    // 浏览器不允许无手势自动出声，第一次点击 / 按键时才真正开始播
+    AudioBus.playAmbience('landing')
+    return () => AudioBus.stopAmbience()
+  }, [])
+  useEffect(() => {
     const id = window.setTimeout(() => setTimedOut(true), PRELOAD_TIMEOUT_MS)
     return () => clearTimeout(id)
   }, [])
