@@ -906,6 +906,8 @@ export interface EndingConfig {
     maxGrow: number
     /** 排版打分时主体的权重（点缀为 1）：越大越优先把主体放大，点缀让位 */
     heroWeight: number
+    /** 点缀中心离主体中心水平至少差多少（× 画框宽）：不够就算三件排成一列，改成一左一右重排 */
+    sideSpread: number
     /** 静止时的轻微漂浮 */
     floatAmplitude: number
     floatSpeed: number
@@ -1887,6 +1889,7 @@ export const ENDING_SCHEMA: SchemaFor<EndingConfig> = {
     specimenGap: num(0, 0.5, 0.005),
     maxGrow: num(0.5, 3, 0.01),
     heroWeight: num(0.5, 5, 0.05),
+    sideSpread: num(0, 0.4, 0.005),
     floatAmplitude: num(0, 0.3, 0.005),
     floatSpeed: num(0, 3, 0.01),
   },

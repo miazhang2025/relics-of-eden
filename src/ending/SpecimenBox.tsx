@@ -61,7 +61,7 @@ function LayoutSolver({ placements }: { placements: Placement[] }) {
   const inner = useFrameInner((s) => s.inner)
   const needGrass = useEndingCfg((c) => c.decor.enabled && !!c.decor.model && c.decor.grass.enabled)
   const [w, h] = useEndingCfg((c) => c.frame.size)
-  const { grassMargin, specimenGap, maxGrow, heroWeight } = useEndingCfg((c) => c.composition)
+  const { grassMargin, specimenGap, maxGrow, heroWeight, sideSpread } = useEndingCfg((c) => c.composition)
   const fitMargin = useEndingCfg((c) => c.decor.fitMargin)
   const decorGap = useEndingCfg((c) => c.decor.specimenGap)
 
@@ -79,7 +79,7 @@ function LayoutSolver({ placements }: { placements: Placement[] }) {
       return Math.abs(x) <= w / 2 && Math.abs(y) <= h / 2
     }
     const items = active.map(({ p, i }) => ({ anchor: [p.position[0], p.position[1]] as [number, number], pts: reports[i]!.pts }))
-    const options = { width: w, height: h, allowed, gap: specimenGap, maxGrow, heroWeight }
+    const options = { width: w, height: h, allowed, gap: specimenGap, maxGrow, heroWeight, minSide: sideSpread * w }
     const plan = solveLayout(items, options)
     const placed: ReturnType<typeof useSpecimenLayout.getState>['placed'] = []
     active.forEach(({ i }, n) => (placed[i] = { ...plan[n], version: reports[i]!.version }))
@@ -94,7 +94,7 @@ function LayoutSolver({ placements }: { placements: Placement[] }) {
       return out
     })
     useSpecimenLayout.setState({ placed, occupied: makeOccupancy(shapes, decorGap) })
-  }, [placements, reports, clear, inner, needGrass, w, h, grassMargin, specimenGap, maxGrow, heroWeight, fitMargin, decorGap])
+  }, [placements, reports, clear, inner, needGrass, w, h, grassMargin, specimenGap, maxGrow, heroWeight, sideSpread, fitMargin, decorGap])
 
   return null
 }

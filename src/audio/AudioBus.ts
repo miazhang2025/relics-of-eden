@@ -1,5 +1,6 @@
 // 音频总线：ambience / sfx / master。
-// ambience：每个探索场景一首循环背景音乐（public/audio/<scene>.mp3，源文件在 art/textures/music/，用 ffmpeg 转成 mp3），
+// ambience：每个探索场景一首循环背景音乐（public/audio/<scene>.mp3，源文件在 art/textures/music/，用 ffmpeg 转成 mp3，
+// 并用 loudnorm 统一响度到 -20 LUFS，保证各场景音量一致、不会太响），
 // 走 WebAudio GainNode 做淡入淡出（iOS Safari 不认 HTMLAudioElement.volume）。ending 页也有一首（public/audio/ending.mp3）。
 // sfx 素材未到位，仍是静音占位（只打 console.debug），调用点已经埋好。
 
@@ -14,6 +15,9 @@ const AMBIENCE: Partial<Record<SceneId | 'ending', string>> = {
   ocean: 'audio/ocean.mp3',
   ending: 'audio/ending.mp3',
 }
+
+/** ending 没有自己的 audio 段，淡入在场景 fadeIn 的基础上再拉长这么多秒，让音乐慢慢浮上来 */
+const ENDING_EXTRA_FADE_IN = 4.5
 
 const url = (path: string) => `${import.meta.env.BASE_URL}${path}`
 
@@ -105,7 +109,7 @@ export const AudioBus = {
     current = { key: scene, el, gain }
     void audio.resume()
     tryPlay(el)
-    rampTo(gain, ambienceLevel(cfg), cfg.ambience.fadeIn)
+    rampTo(gain, ambienceLevel(cfg), cfg.ambience.fadeIn + (scene === 'ending' ? ENDING_EXTRA_FADE_IN : 0))
   },
   stopAmbience() {
     if (!current) return

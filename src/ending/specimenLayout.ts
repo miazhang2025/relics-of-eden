@@ -161,13 +161,47 @@ export interface LayoutOptions {
   maxGrow: number
   /** 打分时主体的权重（点缀为 1）：越大越偏向先把主体放大 */
   heroWeight: number
+  /** 两件点缀的中心离主体中心在水平方向至少差多少（标本盒单位），否则算「排成一列」，改成左右分开重排 */
+  minSide: number
 }
 
 /**
  * 依次摆主体、前景点缀、远景点缀：每件在落位点附近找位置，尽量大（越远离落位点越吃亏），且不进禁区、不碰已摆好的。
  * 点缀的放大倍数不超过主体的 ACCENT_RATIO 倍（基准大小本来就分了主次）。主体放大倍数从 maxGrow 往下试几档，取三件加权总大小最大的一种。
+ * 排出来三件竖成一列（点缀在主体正下方，或两件在同一侧）的，再按「两件点缀分在主体左右」重排一次；
+ * 本来就左右分开的结果不变。
  */
 export function solveLayout(items: LayoutItem[], o: LayoutOptions): { dx: number; dy: number; k: number }[] {
+  // 每件轮廓的水平中心（相对落位点、基准大小）
+  const meanX = items.map(({ pts }) => {
+    let sum = 0
+    for (let p = 0; p < pts.length; p += 2) sum += pts[p]
+    return pts.length ? sum / (pts.length / 2) : 0
+  })
+  const centerX = (i: number, p: { dx: number; k: number }) => items[i].anchor[0] + p.dx + p.k * meanX[i]
+  const isColumn = (plan: { dx: number; k: number }[]) => {
+    if (items.length < 3) return false
+    const hx = centerX(0, plan[0])
+    const d1 = centerX(1, plan[1]) - hx
+    const d2 = centerX(2, plan[2]) - hx
+    return Math.sign(d1) === Math.sign(d2) || Math.min(Math.abs(d1), Math.abs(d2)) < o.minSide
+  }
+  const plan = solveOnce(items, o, null, centerX)
+  if (!isColumn(plan)) return plan
+  // 点缀各去落位点所在的一侧（落位点本来就是一左一右，镜像时也跟着翻）
+  const s1 = Math.sign(items[1].anchor[0] - items[0].anchor[0]) || -1
+  const sides = [0, s1, -s1]
+  const split = solveOnce(items, o, sides, centerX)
+  return isColumn(split) ? plan : split
+}
+
+function solveOnce(
+  items: LayoutItem[],
+  o: LayoutOptions,
+  /** sides[i]：第 i 件点缀必须在主体的哪一侧（-1 左 / 1 右），中心至少差 minSide；null = 不限 */
+  sides: number[] | null,
+  centerX: (i: number, p: { dx: number; k: number }) => number,
+): { dx: number; dy: number; k: number }[] {
   const nx = Math.ceil(o.width / CELL) + 1
   const ny = Math.ceil(o.height / CELL) + 1
   const x0 = -o.width / 2
@@ -218,9 +252,11 @@ export function solveLayout(items: LayoutItem[], o: LayoutOptions): { dx: number
   const heroOffsets = makeOffsets(6)
   const accentOffsets = makeOffsets(3)
 
-  const place = (item: LayoutItem, cap: number, occ: Uint8Array, offsets = accentOffsets) => {
+  const place = (index: number, cap: number, occ: Uint8Array, offsets = accentOffsets, heroX = 0) => {
+    const item = items[index]
     let best = { dx: 0, dy: 0, k: 0, score: 0 }
     const [ax, ay] = item.anchor
+    const side = sides?.[index] ?? 0
     for (const [dx, dy, w] of offsets) {
       // 这个位置要超过当前最优，至少得放到 need 这么大
       const need = Math.max(best.score / w, 0.05)
@@ -236,6 +272,7 @@ export function solveLayout(items: LayoutItem[], o: LayoutOptions): { dx: number
           else hi = mid
         }
       }
+      if (side && side * (centerX(index, { dx, k: lo }) - heroX) < o.minSide) continue
       if (lo * w > best.score) best = { dx, dy, k: lo, score: lo * w }
     }
     return best
@@ -250,7 +287,7 @@ export function solveLayout(items: LayoutItem[], o: LayoutOptions): { dx: number
       if (rows.has(dy)) continue
       if (fits(item.pts, item.anchor[0] + dx, item.anchor[1] + dy, cap, new Uint8Array(0))) rows.set(dy, { dx, dy, k: cap, score: cap * w })
     }
-    return rows.size ? [...rows.values()] : [place(item, cap, new Uint8Array(nx * ny), heroOffsets)]
+    return rows.size ? [...rows.values()] : [place(0, cap, new Uint8Array(nx * ny), heroOffsets)]
   }
 
   let bestPlan: { dx: number; dy: number; k: number }[] = items.map(() => ({ dx: 0, dy: 0, k: 1 }))
@@ -266,8 +303,9 @@ export function solveLayout(items: LayoutItem[], o: LayoutOptions): { dx: number
       stamp(items[0].pts, items[0].anchor[0] + hero.dx, items[0].anchor[1] + hero.dy, plan[0].k, occ)
       // 越离开落位点越吃亏（score = k × 距离权重）；点缀小于 ACCENT_MIN 按差距扣分
       let score = o.heroWeight * hero.score
+      const heroX = centerX(0, plan[0])
       for (let i = 1; i < items.length; i++) {
-        const p = place(items[i], Math.min(o.maxGrow, heroK * ACCENT_RATIO), occ)
+        const p = place(i, Math.min(o.maxGrow, heroK * ACCENT_RATIO), occ, accentOffsets, heroX)
         // 实在放不下：留在落位点、缩得很小（不该发生，兜底）
         const k = p.k > 0 ? p.k : 0.2
         plan.push({ dx: p.dx, dy: p.dy, k })

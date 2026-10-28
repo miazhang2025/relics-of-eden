@@ -151,6 +151,7 @@
     "specimenGap": 0.08,
     "maxGrow": 1.6,
     "heroWeight": 1.3,
+    "sideSpread": 0.08,
     "floatAmplitude": 0.03,
     "floatSpeed": 0.25
   },
