@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Relics of Eden · 伊甸遗存录</title>
     <!-- placeholder 字体：Emilys Candy 标题 / Pinyon Script 花体 / Silkscreen 像素 UI / Nunito 正文 -->
+    <!-- 开始页音乐最先下载（在 JS 执行之前就开始），AudioBus 里的 fetch 会直接复用这份 -->
+    <link rel="preload" href="/audio/landing.mp3" as="fetch" crossorigin="anonymous" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

@@ -64,22 +64,49 @@ function fadeOutAndDispose(track: Track, seconds: number) {
   rampTo(track.gain, 0, seconds)
   window.setTimeout(() => {
     track.el.pause()
+    // 只断开元素，不 revoke blob：同一首以后还会再用（比如从 ending 回到开始页）
     track.el.removeAttribute('src')
     track.el.load()
     track.gain.disconnect()
   }, seconds * 1000 + 100)
 }
 
-function tryPlay(el: HTMLAudioElement) {
-  el.play().catch(() => {
-    // 开始页、或直接刷新进场景页时没有用户手势，等第一次交互再播
-    const retry = () => {
-      if (current?.el !== el) return // 等待期间已经切走了
-      void ctx?.resume()
-      void el.play().catch(() => {})
-    }
-    window.addEventListener('pointerdown', retry, { once: true })
-    window.addEventListener('keydown', retry, { once: true })
+/**
+ * 整首 mp3 先下载成 blob 再交给 <audio>：开始页同时在预加载几十 MB 的模型 / 贴图，
+ * 用流式 <audio> 会被挤到后面，要等很久才出声。fetch 和 index.html 里的 <link rel=preload> 命中同一份请求。
+ */
+const blobs = new Map<AmbienceKey, Promise<string>>()
+
+function loadTrack(key: AmbienceKey): Promise<string> {
+  const src = AMBIENCE[key]
+  if (!src) return Promise.reject(new Error(`no ambience for ${key}`))
+  let p = blobs.get(key)
+  if (!p) {
+    p = fetch(url(src), { priority: 'high' } as RequestInit)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status} ${src}`)
+        return r.blob()
+      })
+      .then((b) => URL.createObjectURL(b))
+    // 失败了下次重新下载；这次退回直接用网络地址
+    p.catch(() => blobs.delete(key))
+    blobs.set(key, p)
+  }
+  return p
+}
+
+function tryPlay(track: Track) {
+  if (current !== track || !track.el.src) return
+  void ctx?.resume()
+  // 没有用户手势时会被拒绝，等下面的手势监听再播
+  track.el.play().catch(() => {})
+}
+
+// 开始页、或直接刷新进场景页时没有用户手势，浏览器不让出声：每次点击 / 按键都检查一下，把该播的播起来
+for (const type of ['pointerdown', 'keydown'] as const) {
+  window.addEventListener(type, () => {
+    if (current?.el.paused) tryPlay(current)
+    else void ctx?.resume()
   })
 }
 
@@ -104,16 +131,38 @@ export const AudioBus = {
     const audio = getCtx()
     if (!scene || !src || !audio) return
 
-    const el = new Audio(url(src))
+    const el = new Audio()
     el.loop = true
     el.preload = 'auto'
     const gain = audio.createGain()
     gain.gain.value = 0
     audio.createMediaElementSource(el).connect(gain).connect(audio.destination)
-    current = { key: scene, el, gain }
-    void audio.resume()
-    tryPlay(el)
-    rampTo(gain, ambienceLevel(cfg), cfg.ambience.fadeIn + (scene === 'ending' ? ENDING_EXTRA_FADE_IN : 0))
+    const track: Track = { key: scene, el, gain }
+    current = track
+    // 真正开始出声时才淡入，不然下载 / 等手势期间淡入就已经走完了
+    el.addEventListener(
+      'playing',
+      () => {
+        if (current !== track) return
+        const c = audioCfg()
+        rampTo(gain, ambienceLevel(c), c.ambience.fadeIn + (scene === 'ending' ? ENDING_EXTRA_FADE_IN : 0))
+      },
+      { once: true },
+    )
+    loadTrack(scene)
+      .catch(() => url(src))
+      .then((blobUrl) => {
+        if (current !== track) return
+        el.src = blobUrl
+        tryPlay(track)
+      })
+  },
+  /** 提前把某首下载好（开始页先下 landing，再顺带下第一个场景的） */
+  preload(key: AmbienceKey): Promise<void> {
+    return loadTrack(key).then(
+      () => {},
+      () => {},
+    )
   },
   stopAmbience() {
     if (!current) return

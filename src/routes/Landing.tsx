@@ -15,6 +15,8 @@ function LandingArtifactSlot() {
 
 /** 预加载最长等多久（毫秒），超时后开始按钮也放行 */
 const PRELOAD_TIMEOUT_MS = 45000
+/** 开始页音乐最多先下载这么久，之后不管下没下完都开始预加载场景 */
+const AUDIO_FIRST_MAX_MS = 4000
 
 const LANGS: { id: Lang; label: string }[] = [
   { id: 'en', label: 'EN' },
@@ -60,6 +62,18 @@ export default function Landing() {
     // 浏览器不允许无手势自动出声，第一次点击 / 按键时才真正开始播
     AudioBus.playAmbience('landing')
     return () => AudioBus.stopAmbience()
+  }, [])
+  // 先让开始页音乐下载完，再开始预加载场景（模型 / 贴图很大，同时下载会把音乐挤到很后面）；
+  // 音乐下载卡住时最多等 AUDIO_FIRST_MAX_MS 就放行。之后再顺带下第一个场景的音乐
+  const [audioFirst, setAudioFirst] = useState(false)
+  useEffect(() => {
+    const go = () => setAudioFirst(true)
+    const id = window.setTimeout(go, AUDIO_FIRST_MAX_MS)
+    void AudioBus.preload('landing').then(() => {
+      go()
+      void AudioBus.preload(SCENE_ORDER[0])
+    })
+    return () => clearTimeout(id)
   }, [])
   useEffect(() => {
     const id = window.setTimeout(() => setTimedOut(true), PRELOAD_TIMEOUT_MS)
@@ -144,7 +158,7 @@ export default function Landing() {
           </div>
         </div>
       </div>
-      <ScenePreloader onProgress={(done, total) => setProgress({ done, total })} />
+      {audioFirst && <ScenePreloader onProgress={(done, total) => setProgress({ done, total })} />}
     </main>
   )
 }
