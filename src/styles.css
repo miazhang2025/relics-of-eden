@@ -561,6 +561,46 @@ body,
   0%, 100% { filter: saturate(0.6) brightness(1.02); }
   50% { filter: saturate(1) brightness(1.06); }
 }
+/* 开始页前的黑屏：只有一个 Enter，点了解锁音频，再淡出露出开始页 */
+.enter-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background: #000;
+  transition: opacity 1.2s ease;
+}
+.enter-gate.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.enter-gate__btn {
+  padding: 16px 32px;
+  border: 0;
+  background: none;
+  color: var(--pink-100);
+  font-family: var(--font-pixel);
+  font-size: 18px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(255, 166, 211, 0.7), 0 0 18px rgba(244, 125, 189, 0.45);
+  cursor: pointer;
+  animation: enter-gate-breathe 2.4s ease-in-out infinite;
+}
+.enter-gate__btn:hover,
+.enter-gate__btn:focus-visible {
+  color: #fff;
+  outline: none;
+  animation-play-state: paused;
+}
+@keyframes enter-gate-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enter-gate__btn { animation: none; }
+}
 /* 开始页的隐藏预加载画布 */
 .preloader {
   position: fixed;

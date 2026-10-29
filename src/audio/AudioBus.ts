@@ -157,6 +157,17 @@ export const AudioBus = {
         tryPlay(track)
       })
   },
+  /**
+   * 在用户手势里调用（开始页前的 Enter 黑屏）：恢复 AudioContext 并立刻播当前曲目。
+   * blob 还没下完时直接改用网络地址边下边播——Safari 只认手势里同步调用的 play()，等下完再播会被拦。
+   */
+  unlock() {
+    void getCtx()?.resume()
+    if (!current?.el.paused) return
+    const src = AMBIENCE[current.key]
+    if (!current.el.src && src) current.el.src = url(src)
+    tryPlay(current)
+  },
   /** 提前把某首下载好（开始页先下 landing，再顺带下第一个场景的） */
   preload(key: AmbienceKey): Promise<void> {
     return loadTrack(key).then(

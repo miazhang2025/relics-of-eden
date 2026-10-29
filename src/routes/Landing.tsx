@@ -36,6 +36,34 @@ const DECO: DecoItem[] = [
   ['star', 12, 36, 12, 0.4],
 ]
 
+/** 本次打开页面是否已经点过 Enter 黑屏（从结尾回到开始页时不再出现） */
+let gatePassed = false
+
+/**
+ * 开始页前的黑屏，只有一个 Enter：浏览器不允许无手势自动出声，点这一下解锁音频，开始页音乐随开始页一起出现。
+ * 黑屏期间开始页已在背后挂载，音乐和场景预加载照常进行。
+ */
+function EnterGate() {
+  const [state, setState] = useState<'shown' | 'leaving' | 'gone'>(gatePassed ? 'gone' : 'shown')
+  if (state === 'gone') return null
+  const open = () => {
+    if (state !== 'shown') return
+    gatePassed = true
+    AudioBus.unlock()
+    setState('leaving')
+  }
+  return (
+    <div
+      className={`enter-gate ${state === 'leaving' ? 'is-leaving' : ''}`}
+      onTransitionEnd={(e) => e.target === e.currentTarget && setState('gone')}
+    >
+      <button className="enter-gate__btn" onClick={open} autoFocus>
+        Enter
+      </button>
+    </div>
+  )
+}
+
 /** 把步骤句子里的 {name} 换成高亮的场景名 */
 function StepText({ scene }: { scene: string }) {
   const [before, after] = copy(`landing.step.${scene}.text`).split('{name}')
@@ -158,6 +186,7 @@ export default function Landing() {
           </div>
         </div>
       </div>
+      <EnterGate />
       {audioFirst && <ScenePreloader onProgress={(done, total) => setProgress({ done, total })} />}
     </main>
   )
